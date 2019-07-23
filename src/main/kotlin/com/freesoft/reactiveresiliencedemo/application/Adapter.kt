@@ -1,4 +1,4 @@
-package com.freesoft.reactiveresiliencedemo.infrastructure
+package com.freesoft.reactiveresiliencedemo.application
 
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -10,6 +10,8 @@ interface Adapter {
     fun success(): String
 
     fun ignoreException(): String
+
+    fun fluxSuccess(): Flux<String>
 
     fun failureFlux(): Flux<String>
 

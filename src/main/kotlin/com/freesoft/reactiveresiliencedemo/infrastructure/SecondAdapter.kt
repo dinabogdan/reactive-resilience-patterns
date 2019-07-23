@@ -2,11 +2,11 @@ package com.freesoft.reactiveresiliencedemo.infrastructure
 
 import com.freesoft.reactiveresiliencedemo.application.Adapter
 import com.freesoft.reactiveresiliencedemo.application.exception.IgnorableException
-import com.freesoft.reactiveresiliencedemo.infrastructure.FirstAdapter.Companion.ADAPTER_NAME
+import com.freesoft.reactiveresiliencedemo.infrastructure.SecondAdapter.Companion.ADAPTER_NAME
 import io.github.resilience4j.bulkhead.annotation.Bulkhead
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter
 import io.github.resilience4j.retry.annotation.Retry
+import io.vavr.control.Try
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.web.client.HttpServerErrorException
@@ -18,11 +18,10 @@ import java.util.concurrent.CompletableFuture
 @Component(ADAPTER_NAME)
 @Retry(name = ADAPTER_NAME)
 @RateLimiter(name = ADAPTER_NAME)
-@CircuitBreaker(name = ADAPTER_NAME)
-class FirstAdapter : Adapter {
+class SecondAdapter : Adapter {
 
     companion object {
-        const val ADAPTER_NAME = "firstAdapter"
+        const val ADAPTER_NAME = "secondAdapter"
     }
 
     @Bulkhead(name = ADAPTER_NAME)
@@ -31,13 +30,12 @@ class FirstAdapter : Adapter {
     }
 
     @Bulkhead(name = ADAPTER_NAME)
-    override fun success(): String = "A success response from $ADAPTER_NAME"
+    override fun success(): String = "Success response from $ADAPTER_NAME"
 
     override fun ignoreException(): String {
         throw IgnorableException("Because this is a business exception it will be ignored by the CircuitBreaker of $ADAPTER_NAME")
     }
 
-    @Bulkhead(name = ADAPTER_NAME)
     override fun fluxSuccess(): Flux<String> = Flux.just("Hello", "From $ADAPTER_NAME")
 
     @Bulkhead(name = ADAPTER_NAME)
@@ -47,10 +45,9 @@ class FirstAdapter : Adapter {
     override fun monoSuccess(): Mono<String> = Mono.just("A reactive success response from $ADAPTER_NAME")
 
     @Bulkhead(name = ADAPTER_NAME)
-    override fun monoFailure(): Mono<String> = Mono.error(IOException("Something bad, again"))
+    override fun monoFailure(): Mono<String> = Mono.error(IOException("Something bad, again, from $ADAPTER_NAME"))
 
-    @CircuitBreaker(name = ADAPTER_NAME, fallbackMethod = "aFallback")
-    override fun failureWithFallback(): String = failure()
+    override fun failureWithFallback(): String = Try.of { failure() }.recover { "Recovered $ADAPTER_NAME" }.get()
 
     @Bulkhead(name = ADAPTER_NAME, type = Bulkhead.Type.THREADPOOL)
     override fun futureSuccess(): CompletableFuture<String> = CompletableFuture.completedFuture("A future success from $ADAPTER_NAME")
@@ -58,11 +55,7 @@ class FirstAdapter : Adapter {
     @Bulkhead(name = ADAPTER_NAME, type = Bulkhead.Type.THREADPOOL)
     override fun futureFailure(): CompletableFuture<String> {
         val future = CompletableFuture<String>()
-        future.completeExceptionally(IOException("A future failure from $ADAPTER_NAME"))
+        future.completeExceptionally(IOException("A future failure from ${ADAPTER_NAME}"))
         return future
     }
-
-    private fun aFallback(exception: HttpServerErrorException) = "Recovered HttpServerErrorException: ${exception.message}"
-
-    private fun aFallback(exception: Throwable) = "Recovered Throwable: ${exception.message}"
 }
