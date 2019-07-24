@@ -1,0 +1,101 @@
+spring:
+  application.name: reactive-resilience-demo
+  jackson.serialization.indent_output: true
+
+server:
+  port: 9000
+
+management.endpoints.web.exposure.include: '*'
+management.endpoint.health.show-details: always
+management.metrics.tags.application: ${spring.application.name}
+management.metrics.distribution.percentiles-histogram.http.server.requests: true
+management.metrics.distribution.percentiles-histogram.resilience4j.circuitbreaker.calls: true
+
+resilience4j.circuitbreaker:
+  configs:
+    default:
+      registerHealthIndicator: true
+      ringBufferSizeInClosedState: 10
+      ringBufferSizeInHalfOpenState: 3
+      automaticTransitionFromOpenToHalfOpenEnabled: true
+      waitDurationInOpenState: 2s
+      failureRateThreshold: 50
+      eventConsumerBufferSize: 10
+      ignoreExceptions:
+        - com.freesoft.reactiveresiliencedemo.application.exception.IgnorableException
+    shared:
+      registerHealthIndicator: true
+      ringBufferSizeInClosedState: 100
+      ringBufferSizeInHalfOpenState: 30
+      waitDurationInOpenState: 1s
+      failureRateThreshold: 50
+      eventConsumerBufferSize: 10
+      ignoreExceptions:
+        - com.freesoft.reactiveresiliencedemo.application.exception.IgnorableException
+  instances:
+    firstAdapter:
+      baseConfig: default
+      ringBufferSizeInClosedState: 5
+    secondAdapter:
+      registerHealthIndicator: true
+      ringBufferSizeInClosedState: 10
+      ringBufferSizeInHalfOpenState: 3
+      waitDurationInOpenState: 1s
+      failureRateThreshold: 50
+      eventConsumerBufferSize: 10
+      recordFailurePredicate: com.freesoft.reactiveresiliencedemo.application.exception.RecordFailure
+resilience4j.retry:
+  configs:
+    default:
+      maxRetryAttempts: 2
+      waitDuration: 100
+      retryExceptions:
+        - org.springframework.web.client.HttpServerErrorException
+        - java.io.IOException
+      ignoreExceptions:
+        - com.freesoft.reactiveresiliencedemo.application.exception.IgnorableException
+  instances:
+    firstAdapter:
+      maxRetryAttempts: 3
+    secondAdapter:
+      maxRetryAttempts: 3
+resilience4j.bulkhead:
+  configs:
+    default:
+      maxConcurrentCalls: 100
+  instances:
+    firstAdapter:
+      maxConcurrentCalls: 10
+    secondAdapter:
+      maxWaitDuration: 10ms
+      maxConcurrentCalls: 20
+
+resilience4j.thread-pool-bulkhead:
+  configs:
+    default:
+      maxThreadPoolSize: 4
+      coreThreadPoolSize: 2
+      queueCapacity: 2
+  instances:
+    firstAdapter:
+      baseConfig: default
+    secondAdapter:
+      maxThreadPoolSize: 1
+      coreThreadPoolSize: 1
+      queueCapacity: 1
+
+resilience4j.ratelimiter:
+  configs:
+    default:
+      registerHealthIndicator: false
+      limitForPeriod: 10
+      limitRefreshPeriod: 1s
+      timeoutDuration: 0
+      eventConsumerBufferSize: 100
+  instances:
+    firstAdapter:
+      baseConfig: default
+    secondAdapter:
+      limitForPeriod: 6
+      limitRefreshPeriod: 500ms
+      timeoutDuration: 3s
